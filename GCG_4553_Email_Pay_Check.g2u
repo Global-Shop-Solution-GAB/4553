@@ -1,0 +1,321 @@
+Program.Sub.ScreenSU.Start
+Gui.EmailForm..Create
+Gui.EmailForm..Size(7440,10545)
+Gui.EmailForm..MinX(0)
+Gui.EmailForm..MinY(0)
+Gui.EmailForm..Position(0,0)
+Gui.EmailForm..BackColor(-2147483633)
+Gui.EmailForm..MousePointer(0)
+Gui.EmailForm..Event(UnLoad,Form_UnLoad)
+Gui.EmailForm..Caption("Employee Email")
+Gui.EmailForm.GsGridControlEmail.Create(GsGridControl)
+Gui.EmailForm.GsGridControlEmail.Size(6990,9225)
+Gui.EmailForm.GsGridControlEmail.Position(105,225)
+Gui.EmailForm.GsGridControlEmail.Event(CellValueChanged,GsGridControlEmail_CellValueChanged)
+Gui.EmailForm.cmdSaveEmail.Create(Button)
+Gui.EmailForm.cmdSaveEmail.Size(855,375)
+Gui.EmailForm.cmdSaveEmail.Position(105,9570)
+Gui.EmailForm.cmdSaveEmail.Caption("Save")
+Gui.EmailForm.cmdSaveEmail.Event(Click,cmdSaveEmail_Click)
+Program.Sub.ScreenSU.End
+
+Program.Sub.Preflight.Start
+Program.Sub.Preflight.End
+
+Program.Sub.Main.Start
+F.Intrinsic.Control.SetErrorHandler("Main_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sSql.Declare(String)
+
+F.ODBC.Connection!con.OpenConnection(V.Ambient.PDSN,V.Ambient.PUser,V.Ambient.PPass)
+
+F.Intrinsic.Control.If(V.Caller.Hook,=,"36820")
+	F.Intrinsic.Control.CallSub(build_datatable)
+	F.Intrinsic.Control.CallSub(send_email)	
+	F.Intrinsic.Control.CallSub(exit)
+
+F.Intrinsic.Control.Else
+	'shows screen to allow emails to be entered for each active employee.
+	f.Data.DataTable.CreateFromSQL("EmployeeEmail","con","SELECT Employee, Name, RTRIM(' ') as Email FROM v_Employee_Mstr WHERE date_termination = '1900-01-01' ORDER BY EMPLOYEE ASC",True)
+	
+	V.Local.sSql.Set("Select Employee, Email From GCG_4553_PYRL_Email")
+'	F.Data.DataTable.CreateFromSQL("Email","con",V.Local.sSql,True)
+	f.Data.Dictionary.CreateFromSQL("Email","con",v.Local.sSql)
+	f.Data.Dictionary.SetDefaultReturn("Email","")
+	f.Data.DataTable.FillFromDictionary("EmployeeEmail","Email","Employee","Email")
+
+'	V.Local.sSql.Set("Select Employee, NAME From V_Employee_Mstr Where date_termination = '1900-01-01'")
+'	F.Data.DataTable.CreateFromSQL("Employee","con",V.Local.sSql,True)
+
+'	F.Data.Linq.Join("LeftJoin","DataTable","EMPLOYEE*!*A","DataTable","EMAIL*!*B","A.EMPLOYEE = B.EMPLOYEE","A.EMPLOYEE*!*A.NAME*!*B.EMAIL","","A.EMPLOYEE","","EmployeeEmail",True)
+	
+'	F.Data.DataTable.CreateFromSQL("EmployeeEmail","con",V.Local.sSql,True)
+
+	gui.EmailForm.GsGridControlEmail.AddGridviewFromDatatable("Email","EmployeeEmail")
+	gui.EmailForm.GsGridControlEmail.SetColumnProperty("Email","Employee","ReadOnly",True)
+	gui.EmailForm.GsGridControlEmail.SetColumnProperty("Email","Employee","AllowEdit",False)
+	gui.EmailForm.GsGridControlEmail.SetColumnProperty("Email","Email","ReadOnly",False)
+	gui.EmailForm.GsGridControlEmail.SetColumnProperty("Email","Email","AllowEdit",True)
+	gui.EmailForm.GsGridControlEmail.SetColumnProperty("Email","Employee","Width","30")
+	gui.EmailForm.GsGridControlEmail.SetColumnProperty("Email","Name","Width","60")
+
+	'setting anchors on the screen for resizing
+	Gui.EmailForm.GsGridControlEmail.Anchor(15)
+	Gui.EmailForm.cmdSaveEmail.Anchor(6)
+
+	gui.EmailForm.cmdSaveEmail.Enabled(True)
+
+	gui.EmailForm..Show
+
+	gui.EmailForm.GsGridControlEmail.MainView("Email")
+
+F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Main_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4553_Email_Pay_Check.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(exit)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Main.End
+
+Program.Sub.Exit.Start
+F.Intrinsic.Control.SetErrorHandler("Exit_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.ODBC.Connection!con.Close
+F.Intrinsic.Control.End
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Exit_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4553_Email_Pay_Check.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.End
+
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Exit.End
+
+Program.Sub.Build_DataTable.Start
+F.Intrinsic.Control.SetErrorHandler("Build_DataTable_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.sSql.Declare(String)
+
+'getting records from the bi table
+'F.Intrinsic.String.Build("Select Distinct Employee,Check_Date,RPTID From V_BI_PAYROLL_CHKS Where Check_Date <> '1900-01-01' And TRMNL = '{0}' And RPTID = '{1}'",V.Caller.Terminal,"009026",V.Local.sSql)
+'F.Intrinsic.String.Build("Select Distinct Employee,Check_Date,RPTID From V_BI_PAYROLL_CHKS Where Check_Date <> '1900-01-01' And TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSql)
+F.Intrinsic.String.Build("Select Distinct Employee,Check_Date,RPTID, RTRIM(' ') AS Email, RTRIM(' ') AS Name From V_BI_PAYROLL_CHKS Where Check_Date <> '1900-01-01' And TRMNL = '{0}'",V.Caller.Terminal,V.Local.sSql)
+'F.Data.DataTable.CreateFromSQL("Pay","con",V.Local.sSql,True)
+F.Data.DataTable.CreateFromSQL("EmpNameEmail","con",V.Local.sSql,True)
+
+'getting email for employee's
+V.Local.sSql.Set("Select Employee, Email from GCG_4553_PYRL_Email")
+'F.Data.DataTable.CreateFromSQL("Emp","con",V.Local.sSql,True)
+f.Data.Dictionary.CreateFromSQL("Emp","con",v.Local.sSql)
+f.Data.Dictionary.SetDefaultReturn("Emp","")
+f.Data.DataTable.FillFromDictionary("EmpNameEmail","Emp","Employee","Email")
+
+'F.Intrinsic.Control.If(V.DataTable.Pay.RowCount--,<>,-1,"AND",V.DataTable.Emp.RowCount--,<>,-1)
+'	'joining both datatables
+'	F.Data.Linq.Join("Leftjoin","DataTable","PAY*!*A","DataTable","Emp*!*B","A.Employee = B.Employee","A.Employee*!*A.Check_Date*!*A.RPTID*!*B.Email","","A.EMPLOYEE","","EmpEmail",True)
+
+	F.Intrinsic.Control.If(V.DataTable.EmpNameEmail.Exists,=,True)
+		'getting employee name from employee number
+		V.Local.sSql.Set("Select Employee, Name From V_Employee_Mstr")
+'		F.Data.DataTable.CreateFromSQL("Name","con",V.Local.sSql,True)
+		F.Data.Dictionary.CreateFromSQL("Name","con",v.Local.sSql)
+		f.Data.Dictionary.SetDefaultReturn("Name","")
+		f.Data.DataTable.FillFromDictionary("EmpNameEmail","Name","Employee","Name")
+'		F.Intrinsic.Control.If(V.DataTable.Name.RowCount--,<>,-1)
+'			'joining this table to the other two tales that have already been joined
+'			'this table will be used when emailing employees the paystub
+'			F.Data.Linq.Join("Leftjoin","DataTable","EmpEmail*!*A","DataTable","Name*!*B","A.Employee = B.Employee","A.Employee*!*A.Check_Date*!*A.RPTID*!*A.Email*!*B.Name"," ","A.EMPLOYEE","A.EMPLOYEE","EmpNameEmail",True)
+'		F.Intrinsic.Control.EndIf
+	F.Intrinsic.Control.EndIf
+'F.Intrinsic.Control.EndIf
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Build_DataTable_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4553_Email_Pay_Check.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(exit)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Build_DataTable.End
+
+Program.Sub.Send_Email.Start
+F.Intrinsic.Control.SetErrorHandler("Send_Email_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+V.Local.i.Declare(Long)
+V.Local.iBiRunID.Declare(Long)
+V.Local.iRptID.Declare(Long)
+V.Local.iLogID.Declare(Long)
+V.Local.sDir.Declare(String)
+V.Local.bRet.Declare(Boolean)
+V.Local.sParams.Declare(String)
+V.Local.sRetFile.Declare(String)
+V.Local.sBody.Declare(String)
+V.Local.sFqn.Declare(String)
+V.Local.sMess.Declare(String)
+V.Local.iCount.Declare(Long)
+V.Local.sFile.Declare(String)
+V.Local.sVal.Declare(String)
+V.Local.bFile.Declare(Boolean)
+V.Local.iID.Declare(Long)
+V.Local.sTemp.Declare(String)
+V.Local.sUserEmail.Declare(String)
+
+F.Intrinsic.String.Build("Attached is your Cox Machine direct deposit pay stub.",V.Ambient.NewLine,V.Local.sBody)
+F.Intrinsic.String.Build("{0}\Paystubs",V.Caller.PluginsDir,V.Local.sDir)
+F.Intrinsic.File.DirExists(V.Local.sDir,V.Local.bRet)
+
+F.Intrinsic.Control.If(V.Local.bRet,=,False)
+	F.Intrinsic.File.CreateDir(V.Local.sDir)
+F.Intrinsic.Control.EndIf
+
+'required report params
+V.Local.sParams.Set("TERMINAL*!*Rptid*!*Employee")
+F.Intrinsic.String.Build("{0}\PAYSTUB_{1}",V.System.Temp,V.Caller.Terminal,V.Local.sRetFile)
+
+F.Intrinsic.Control.If(V.DataTable.EmpNameEmail.Exists,=,True)
+	F.Intrinsic.UI.InvokeWaitDialog("Paystub Email Processing...","Email Paystub Program")
+
+	F.Intrinsic.Control.For(V.Local.i,0,V.DataTable.EmpNameEmail.RowCount--,1)
+		F.Intrinsic.Math.Add(V.Local.i,1,V.Local.iCount)
+		F.Intrinsic.String.Build("Emailing paystub for Employee : {0} {1} Name: {2}{1}{1}{1} {3} of {4}",V.DataTable.EmpNameEmail(V.Local.i).Employee!FieldValTrim,V.Ambient.Tab,V.DataTable.EmpNameEmail(V.Local.i).Name!FieldValTrim,V.Local.iCount,V.DataTable.EmpNameEmail.RowCount,V.Local.sMess)
+		F.Intrinsic.UI.ChangeWaitStatus(V.Local.sMess,V.Local.i,0,V.DataTable.EmpNameEmail.RowCount--)
+
+		F.Intrinsic.String.Build("{0}*!*{1}*!*{2}",V.Caller.Terminal,V.DataTable.EmpNameEmail(V.Local.i).RptID!FieldValTrim,V.DataTable.EmpNameEmail(V.Local.i).Employee!FieldValTrim,V.Local.sVal)
+		F.Intrinsic.String.Build("{0}_{1}.pdf",V.DataTable.EmpNameEmail(V.Local.i).Employee!FieldValTrim,V.DataTable.EmpNameEmail(V.Local.i).Check_Date!FieldValTrim,V.Local.sFile)
+		F.Intrinsic.File.MakeFilenameFriendly(v.Local.sFile,v.Local.sFile)
+		'make it file name friendly
+		F.Intrinsic.String.Build("{0}\{1}",V.Local.sDir,V.Local.sFile,V.Local.sFqn)
+
+		'Getting Rund ID and Long ID
+		F.Global.BI.GetRunID(V.Local.iBIRUNID)
+		F.Global.BI.GetIDFromName("GCG_4553_PY_LongChk.rpt",V.Local.iRptID)
+		F.Global.BI.StartLogging(V.Local.iBIRUNID,V.Local.iRptID,-1,"GCG_4353_PY_LongChk.rpt",V.Local.iLogID)
+
+		F.Global.BI.RunReportPreProcessor(V.Local.iBIRUNID,V.Local.iLOGID,V.Local.sParams,V.Local.sVal,"",4,True,"",-1,"",0,V.Local.sFQN,"",V.Local.sParams,V.Local.sRetFile,V.Local.iLOGID)
+
+		F.Global.BI.StopLogging(V.Local.iLOGID)
+
+		F.Intrinsic.File.Exists(V.Local.sFQN,V.Local.bFile)
+		F.Intrinsic.Control.If(V.Local.bFile,=,False)
+			F.Intrinsic.UI.Msgbox("PDF was not created.Please contact Global Shop.")
+			F.Intrinsic.Control.CallSub(exit)
+		F.Intrinsic.Control.EndIf
+
+		F.Intrinsic.File.Exists(V.Local.sFQN,V.Local.bRet)
+		F.Intrinsic.Control.If(V.Local.bRet,=,True)
+			F.Intrinsic.String.Build("Paycheck Stub {0}",V.DataTable.EmpNameEmail(V.Local.i).Check_Date!FieldValTrim,V.Local.sTemp)
+			F.Intrinsic.String.Build("{0}*!*{1}",V.Local.sFile,V.Local.sDir,V.Local.sFile)
+			F.Global.Security.getuserID(V.Caller.User,V.Caller.CompanyCode,V.Local.iID)
+			F.Global.Security.GetUserEmail(V.Caller.User,V.Caller.CompanyCode,V.Local.sUserEmail)
+
+			Function.Global.Messaging.QueueMessage(V.Caller.CompanyCode,V.local.iID,"",V.Local.sTemp,V.Local.sUserEmail,V.DataTable.EmpNameEmail(V.Local.i).Email!FieldValTrim,v.Local.sBody,5,,False,,,,,,,,V.Local.sFile,True)
+
+		F.Intrinsic.Control.EndIf
+
+	F.Intrinsic.Control.Next(V.Local.i)
+
+	F.Intrinsic.UI.CloseWaitDialog
+
+F.Intrinsic.Control.EndIf
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Send_Email_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4553_Email_Pay_Check.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(exit)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Send_Email.End
+
+Program.Sub.Form_UnLoad.Start
+F.Intrinsic.Control.SetErrorHandler("Form_UnLoad_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+gui.EmailForm..Visible(False)
+
+F.Intrinsic.Control.CallSub(exit)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("Form_UnLoad_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4553_Email_Pay_Check.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(exit)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.Form_UnLoad.End
+
+Program.Sub.cmdSaveEmail_Click.Start
+F.Intrinsic.Control.SetErrorHandler("cmdSaveEmail_Click_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+F.Data.DataTable.SaveToDB("EmployeeEmail","con","GCG_4553_PYRL_Email","Employee",256,"Employee@!@Employee*!*Email@!@Email")
+
+gui.EmailForm.cmdSaveEmail.Enabled(False)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("cmdSaveEmail_Click_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4553_Email_Pay_Check.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(exit)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.cmdSaveEmail_Click.End
+
+Program.Sub.GsGridControlEmail_CellValueChanged.Start
+F.Intrinsic.Control.SetErrorHandler("GsGridControlEmail_CellValueChanged_Err")
+F.Intrinsic.Control.ClearErrors
+
+V.Local.sError.Declare(String)
+
+gui.EmailForm.cmdSaveEmail.Enabled(True)
+
+F.Intrinsic.Control.ExitSub
+
+F.Intrinsic.Control.Label("GsGridControlEmail_CellValueChanged_Err")
+F.Intrinsic.Control.If(V.Ambient.ErrorNumber,<>,0)
+	Function.Intrinsic.String.Concat("Project: GCG_4553_Email_Pay_Check.g2u",V.Ambient.Newline,V.Ambient.Newline,"Subroutine: ",V.Ambient.CurrentSubroutine,V.Ambient.NewLine,"Error Occurred ",V.Ambient.ErrorNumber," with description ",V.Ambient.ErrorDescription,V.Local.sError)
+	F.Intrinsic.UI.Msgbox(V.Local.sError)
+	F.Intrinsic.Control.CallSub(exit)
+Function.Intrinsic.Control.EndIf
+
+
+Program.Sub.GsGridControlEmail_CellValueChanged.End
+
+Program.Sub.Comments.Start
+${$0$}$$}$RLK$}$6/14/2017 10:11:20 AM$}$False
+Program.Sub.Comments.End
